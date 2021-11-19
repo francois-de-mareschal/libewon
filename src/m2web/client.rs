@@ -1,5 +1,5 @@
 use derive_builder::Builder;
-use reqwest;
+use reqwest::Client as HttpClient;
 
 /// M2Web API client.
 ///
@@ -11,7 +11,7 @@ pub struct Client<'a> {
     t2m_url: &'a str,
     /// HTTP client to connect to the API.
     #[builder(setter(strip_option), default = "reqwest::Client::new()")]
-    http_client: reqwest::Client,
+    http_client: HttpClient,
 }
 
 #[cfg(test)]
@@ -38,9 +38,10 @@ mod test {
     }
 
     #[tokio::test]
-    async fn client_connect_to_api_base_url() {
+    async fn client_connect_to_api_base_url() -> Result<(), reqwest::Error> {
         let server = MockServer::start().await;
         let server_uri = &server.uri();
+
         let client = client::ClientBuilder::default()
             .t2m_url(server_uri)
             .build()
@@ -49,13 +50,10 @@ mod test {
             .respond_with(ResponseTemplate::new(200))
             .mount(&server)
             .await;
-        let status = client
-            .http_client
-            .get(server_uri)
-            .send()
-            .await
-            .unwrap()
-            .status();
+        let status = client.http_client.get(server_uri).send().await?.status();
+
         assert_eq!(status, reqwest::StatusCode::OK);
+
+        Ok(())
     }
 }
