@@ -4,9 +4,14 @@ version = "0.1.0"
 authors = ["François de Mareschal <francois.de-mareschal@outlook.fr>"]
 edition = "2021"
 repository = "https://gitlab.com/francois-de-mareschal/libewon"
-license = "EUPL-1.2"
 license-file = "LICENSE"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+derive_builder = "0"
+reqwest = "0"
+
+[dev-dependencies]
+tokio = {version = "1", features = ["rt", "macros"]}
+wiremock = "0"
