@@ -12,6 +12,10 @@
 //! # use libewon::m2web::client::ClientBuilder;
 //! let _client = ClientBuilder::default()
 //!     .t2m_url("https://m2web.talk2m.com/t2mapi")
+//!     .t2m_account("account1")
+//!     .t2m_username("username1")
+//!     .t2m_password("password1")
+//!     .t2m_developer_id("731e38ec-981f-4f31-9cb5-e87f0d571816")
 //!     .build()
 //!     .unwrap();
 //! ```
