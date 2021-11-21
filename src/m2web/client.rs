@@ -9,6 +9,14 @@ pub struct Client<'a> {
     /// The API base url.
     #[builder(setter(strip_option), default = "\"https://m2web.talk2m.com/t2mapi\"")]
     t2m_url: &'a str,
+    /// The Talk2M corporate account.
+    t2m_account: &'a str,
+    /// The Talk2M user attached to the corporate account.
+    t2m_username: &'a str,
+    /// The password attached to the username.
+    t2m_password: &'a str,
+    /// The Talk2M API key used to check the user is authorized to use the API.
+    t2m_developer_id: &'a str,
     /// HTTP client to connect to the API.
     #[builder(setter(strip_option), default = "reqwest::Client::new()")]
     http_client: HttpClient,
