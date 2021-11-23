@@ -26,6 +26,23 @@ pub struct Client<'a> {
     http_client: HttpClient,
 }
 
+impl<'a> Client<'a> {
+    /// Build the authentication parameters to be passed in the url.
+    fn stateless_auth_parameters(&self) -> String {
+        let mut parameters = String::new();
+
+        parameters.push_str(format!("t2maccount={}", self.t2m_account).as_str());
+        parameters.push('&');
+        parameters.push_str(format!("t2musername={}", self.t2m_username).as_str());
+        parameters.push('&');
+        parameters.push_str(format!("t2mpassword={}", self.t2m_password).as_str());
+        parameters.push('&');
+        parameters.push_str(format!("t2mdeveloperid={}", self.t2m_developer_id).as_str());
+
+        parameters
+    }
+}
+
 #[cfg(test)]
 mod test {
     use crate::m2web::client;
@@ -145,5 +162,31 @@ mod test {
         assert_eq!(status, reqwest::StatusCode::OK);
 
         Ok(())
+    }
+
+    #[test]
+    fn build_stateless_auth_params_url_default() {
+        let generated_auth_params = "t2maccount=account1&t2musername=username1&t2mpassword=password1&t2mdeveloperid=731e38ec-981f-4f31-9cb5-e87f0d571816";
+        let client = client::ClientBuilder::default().build().unwrap();
+
+        let auth_params = client.stateless_auth_parameters();
+
+        assert_eq!(generated_auth_params, auth_params.as_str());
+    }
+
+    #[test]
+    fn build_stateless_auth_params_url_custom() {
+        let generated_auth_params = "t2maccount=account2&t2musername=username2&t2mpassword=password2&t2mdeveloperid=795f1844-2f5e-4d8b-9922-25c45d3e1c47";
+        let client = client::ClientBuilder::default()
+            .t2m_account("account2")
+            .t2m_username("username2")
+            .t2m_password("password2")
+            .t2m_developer_id("795f1844-2f5e-4d8b-9922-25c45d3e1c47")
+            .build()
+            .unwrap();
+
+        let auth_params = client.stateless_auth_parameters();
+
+        assert_eq!(generated_auth_params, auth_params.as_str());
     }
 }
