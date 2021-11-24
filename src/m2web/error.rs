@@ -9,6 +9,12 @@ pub struct Error {
     kind: ErrorKind,
 }
 
+impl Error {
+    pub(crate) fn new(code: u16, kind: ErrorKind) -> Self {
+        Error { code, kind }
+    }
+}
+
 impl error::Error for Error {}
 
 /// Display the HTTP status code and the error message returned by the M2Web API.

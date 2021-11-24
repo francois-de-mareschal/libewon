@@ -1,3 +1,4 @@
+use crate::m2web::{error, ewon::Ewon};
 use derive_builder::Builder;
 use reqwest::Client as HttpClient;
 
@@ -27,6 +28,39 @@ pub struct Client<'a> {
 }
 
 impl<'a> Client<'a> {
+    /// Return the list of all eWONs registered for the corporate account.
+    ///
+    /// The M2Web API allows to get the list of all eWONs associated to the corporate account used
+    /// to connect to. By default, all eWONs are returned, unless an optional pool name if specified
+    /// to the function; only the eWONs belonging to this pool will be returned.
+    ///
+    /// # Example
+    /// ```rust
+    /// # use libewon::m2web::{client::ClientBuilder, error, ewon::Ewon};
+    /// # #[tokio::test]
+    /// # async fn get_all_ewons_from_all_pools() -> Result<Vec<Ewon>, error::Error> {
+    /// // Get all eWONs belonging to the corporate account.
+    /// let client = ClientBuilder::default().build()?;
+    /// let all_ewons = client.get_ewons(None).await?;
+    /// # }
+    /// ```
+    ///
+    /// ```rust
+    /// # use libewon::m2web::{client::ClientBuilder, error, ewon::Ewon};
+    /// # #[tokio::test]
+    /// # async fn get_all_ewons_from_specific_pool() -> Result<Vec<Ewon>, error::Error> {
+    /// // Get all eWONs belonging to the corporate account and the "emea" pool.
+    /// let client = ClientBuilder::default().build()?;
+    /// let all_ewons = client.get_ewons(Some("emea")).await?;
+    /// # }
+    /// ```
+    pub async fn get_ewons(&self, pool: Option<&str>) -> Result<Vec<Ewon>, error::Error> {
+        Err(error::Error::new(
+            403,
+            error::ErrorKind::InvalidCredentials(String::from("Invalid credentials")),
+        ))
+    }
+
     /// Build the authentication parameters to be passed in the url.
     fn build_url_stateless_auth_params(&self) -> String {
         let mut parameters = String::new();
