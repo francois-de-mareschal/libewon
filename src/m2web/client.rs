@@ -238,12 +238,37 @@ mod test {
             .build()
             .unwrap();
         Mock::given(method("GET"))
-            .and(query_param("t2maccount", "account1"))
-            .and(query_param("t2musername", "username1"))
-            .and(query_param("t2mpassword", "password1"))
+            .respond_with(ResponseTemplate::new(403))
+            .mount(&server)
+            .await;
+        let url = client.build_url();
+        let status = client.http_client.get(url).send().await?.status();
+
+        assert_eq!(status, reqwest::StatusCode::FORBIDDEN);
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn stateless_auth_custom_params_ok() -> Result<(), reqwest::Error> {
+        let server = MockServer::start().await;
+        let server_uri = &server.uri();
+
+        let client = client::ClientBuilder::default()
+            .t2m_url(server_uri)
+            .t2m_account("account2")
+            .t2m_username("username2")
+            .t2m_password("password2")
+            .t2m_developer_id("795f1844-2f5e-4d8b-9922-25c45d3e1c47")
+            .build()
+            .unwrap();
+        Mock::given(method("GET"))
+            .and(query_param("t2maccount", "account2"))
+            .and(query_param("t2musername", "username2"))
+            .and(query_param("t2mpassword", "password2"))
             .and(query_param(
                 "t2mdeveloperid",
-                "731e38ec-981f-4f31-9cb5-e87f0d571816",
+                "795f1844-2f5e-4d8b-9922-25c45d3e1c47",
             ))
             .respond_with(ResponseTemplate::new(200))
             .mount(&server)
