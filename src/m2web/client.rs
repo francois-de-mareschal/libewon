@@ -31,13 +31,13 @@ impl<'a> Client<'a> {
     fn build_url_stateless_auth_params(&self) -> String {
         let mut parameters = String::new();
 
-        parameters.push_str(format!("t2maccount={}", self.t2m_account).as_str());
+        parameters.push_str(&format!("t2maccount={}", self.t2m_account));
         parameters.push('&');
-        parameters.push_str(format!("t2musername={}", self.t2m_username).as_str());
+        parameters.push_str(&format!("t2musername={}", self.t2m_username));
         parameters.push('&');
-        parameters.push_str(format!("t2mpassword={}", self.t2m_password).as_str());
+        parameters.push_str(&format!("t2mpassword={}", self.t2m_password));
         parameters.push('&');
-        parameters.push_str(format!("t2mdeveloperid={}", self.t2m_developer_id).as_str());
+        parameters.push_str(&format!("t2mdeveloperid={}", self.t2m_developer_id));
 
         parameters
     }
@@ -49,7 +49,7 @@ impl<'a> Client<'a> {
         request_url.push_str(self.t2m_url);
         // TODO: build endpoint.
         request_url.push('?');
-        request_url.push_str(self.build_url_stateless_auth_params().as_str());
+        request_url.push_str(&self.build_url_stateless_auth_params());
 
         request_url
     }
@@ -183,7 +183,7 @@ mod test {
 
         let auth_params = client.build_url_stateless_auth_params();
 
-        assert_eq!(generated_auth_params, auth_params.as_str());
+        assert_eq!(generated_auth_params, &auth_params);
     }
 
     #[test]
