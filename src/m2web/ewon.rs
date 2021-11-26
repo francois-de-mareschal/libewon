@@ -2,7 +2,7 @@ use derive_builder::Builder;
 /// eWON parameters.
 ///
 /// Each eWON is registered and identified by these parameters.
-#[derive(Builder)]
+#[derive(Builder, Debug, PartialEq)]
 pub struct Ewon<'a> {
     /// The UID of the eWON to the M2Web API.
     id: u32,
@@ -25,7 +25,7 @@ pub struct Ewon<'a> {
 }
 
 /// The current status of the eWON, either connected or disconnected.
-#[derive(Clone)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum EwonStatus {
     /// The eWON is currently online.
     Connected,

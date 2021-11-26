@@ -91,8 +91,11 @@ impl<'a> Client<'a> {
 
 #[cfg(test)]
 mod test {
-    use crate::m2web::client;
-    use wiremock::{matchers::method, matchers::query_param, Mock, MockServer, ResponseTemplate};
+    use crate::m2web::{client, error};
+    use wiremock::{
+        matchers::{method, path, query_param},
+        Mock, MockServer, ResponseTemplate,
+    };
 
     #[test]
     fn build_client_default_t2m_url() -> Result<(), client::ClientBuilderError> {
@@ -311,6 +314,38 @@ mod test {
         let status = client.http_client.get(url).send().await?.status();
 
         assert_eq!(status, reqwest::StatusCode::OK);
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn get_ewons_empty_ok() -> Result<(), error::Error> {
+        let server = MockServer::start().await;
+        let server_uri = &server.uri();
+        let client = client::ClientBuilder::default()
+            .t2m_url(server_uri)
+            .t2m_account("account2")
+            .t2m_username("username2")
+            .t2m_password("password2")
+            .t2m_developer_id("795f1844-2f5e-4d8b-9922-25c45d3e1c47")
+            .build()
+            .unwrap();
+
+        Mock::given(method("GET"))
+            .and(query_param("t2maccount", "account2"))
+            .and(query_param("t2musername", "username2"))
+            .and(query_param("t2mpassword", "password2"))
+            .and(query_param(
+                "t2mdeveloperid",
+                "795f1844-2f5e-4d8b-9922-25c45d3e1c47",
+            ))
+            .and(path("/getewons"))
+            .respond_with(ResponseTemplate::new(200).set_body_json("{}"))
+            .mount(&server)
+            .await;
+
+        let ewons = client.get_ewons(None).await?;
+        assert_eq!(Vec::<client::Ewon>::new(), ewons);
 
         Ok(())
     }
