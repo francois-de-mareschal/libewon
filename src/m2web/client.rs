@@ -233,7 +233,7 @@ mod test {
 
         let auth_params = client.build_url_stateless_auth_params();
 
-        assert_eq!(generated_auth_params, auth_params);
+        assert_eq!(generated_auth_params, &auth_params);
     }
 
     #[test]
