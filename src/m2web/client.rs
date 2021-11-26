@@ -54,7 +54,7 @@ impl<'a> Client<'a> {
     /// let all_ewons = client.get_ewons(Some("emea")).await?;
     /// # }
     /// ```
-    pub async fn get_ewons(&self, pool: Option<&str>) -> Result<Vec<Ewon>, error::Error> {
+    pub async fn get_ewons(&self, pool: Option<&str>) -> Result<Vec<Ewon<'_>>, error::Error> {
         Err(error::Error::new(
             403,
             error::ErrorKind::InvalidCredentials(String::from("Invalid credentials")),
