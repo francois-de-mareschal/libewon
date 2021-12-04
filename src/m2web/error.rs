@@ -19,6 +19,8 @@ pub enum ErrorKind {
     NoContent(String),
     /// This error occurs when the API client is unable to parse and deserialize the JSON response from the API.
     ResponseParsing(String),
+    /// This is a generic error when an unknown error occurred.
+    UnknownError(String),
 }
 
 impl error::Error for Error {}
@@ -36,6 +38,9 @@ impl fmt::Display for Error {
             ErrorKind::ResponseParsing(ref error_message) => {
                 write!(f, "Unable to parse JSON response: {}", error_message)
             }
+            ErrorKind::UnknownError(ref error_message) => {
+                write!(f, "Unknown error: {}", error_message)
+            }
         }
     }
 }
@@ -43,9 +48,18 @@ impl fmt::Display for Error {
 /// Allow to transform reqwest::Error to m2web::Error.
 impl convert::From<reqwest::Error> for Error {
     fn from(error: reqwest::Error) -> Self {
-        Error {
-            code: 401,
-            kind: ErrorKind::InvalidCredentials(format!("{}", error)),
+        match error.status() {
+            Some(reqwest::StatusCode::FORBIDDEN) => Error {
+                code: 403,
+                kind: ErrorKind::InvalidCredentials(format!("{}", error)),
+            },
+            Some(_) | None => Error {
+                code: 500,
+                kind: ErrorKind::UnknownError(format!(
+                    "Unknown error while requesting API: {}",
+                    error
+                )),
+            },
         }
     }
 }

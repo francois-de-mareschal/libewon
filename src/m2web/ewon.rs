@@ -7,17 +7,21 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Serialize, Deserialize)]
 pub(in crate::m2web) struct ApiResponse {
     /// Indicates if the request suceeded or not.
+    #[serde(default)]
     pub(in crate::m2web) success: bool,
     /// A specific eWON have been requested from the API.
+    #[serde(default)]
     pub(in crate::m2web) ewon: Ewon,
     /// All eWON or eWON from a pool have been requested from the API.
+    #[serde(default)]
     pub(in crate::m2web) ewons: Vec<Ewon>,
 }
 
 /// eWON parameters.
 ///
 /// Each eWON is registered and identified by these parameters.
-#[derive(Builder, Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Builder, Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct Ewon {
     /// The UID of the eWON to the M2Web API.
     id: u32,
@@ -26,7 +30,7 @@ pub struct Ewon {
     /// The url-encoded name of the eWON.
     encoded_name: String,
     /// The status of the eWON, either connected or disconnected.
-    status: EwonStatus,
+    status: String,
     /// The user description of the eWON.
     description: String,
     /// The three user-customized attributes of the eWON.
@@ -43,7 +47,7 @@ pub struct Ewon {
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum EwonStatus {
     /// The eWON is currently online.
-    Connected,
+    Offline,
     /// The eWON is currently offline.
-    Disconnected,
+    Online,
 }

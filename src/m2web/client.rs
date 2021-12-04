@@ -78,7 +78,7 @@ impl<'a> Client<'a> {
         if api_response.ewons.is_empty() {
             Err(error::Error {
                 code: 204,
-                kind: error::ErrorKind::NoContent("No eWON were returned by API".to_string()),
+                kind: error::ErrorKind::NoContent(String::from("No eWON were returned by API")),
             })
         } else {
             Ok(api_response.ewons)
@@ -118,9 +118,9 @@ mod test {
     #[tokio::test]
     async fn get_ewons_empty_ok() -> Result<(), error::Error> {
         let server = MockServer::start().await;
-        let server_uri = &server.uri();
+        let server_uri = format!("{}/t2mapi", &server.uri());
         let client = client::ClientBuilder::default()
-            .t2m_url(server_uri)
+            .t2m_url(&server_uri)
             .t2m_account("account2")
             .t2m_username("username2")
             .t2m_password("password2")
@@ -128,11 +128,10 @@ mod test {
             .build()
             .unwrap();
 
-        let api_response = json!({
+        let json_response = json!({
           "ewons": [],
           "success": true
-        })
-        .to_string();
+        });
 
         Mock::given(method("GET"))
             .and(query_param("t2maccount", "account2"))
@@ -143,8 +142,8 @@ mod test {
                 "795f1844-2f5e-4d8b-9922-25c45d3e1c47",
             ))
             .and(query_param("pool", ""))
-            .and(path("/getewons"))
-            .respond_with(ResponseTemplate::new(204).set_body_json(&api_response))
+            .and(path("/t2mapi/getewons"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(&json_response))
             .mount(&server)
             .await;
 
