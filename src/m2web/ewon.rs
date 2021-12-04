@@ -24,23 +24,23 @@ pub(in crate::m2web) struct ApiResponse {
 #[serde(rename_all = "camelCase")]
 pub struct Ewon {
     /// The UID of the eWON to the M2Web API.
-    id: u32,
+    pub(in crate::m2web) id: u32,
     /// The unique name of the eWON.
-    name: String,
+    pub(in crate::m2web) name: String,
     /// The url-encoded name of the eWON.
-    encoded_name: String,
+    pub(in crate::m2web) encoded_name: String,
     /// The status of the eWON, either connected or disconnected.
-    status: String,
+    pub(in crate::m2web) status: String,
     /// The user description of the eWON.
-    description: String,
+    pub(in crate::m2web) description: String,
     /// The three user-customized attributes of the eWON.
-    custom_attributes: [String; 3],
+    pub(in crate::m2web) custom_attributes: [String; 3],
     /// The M2Web VPN server on which the eWON is connected to.
-    m2web_server: String,
+    pub(in crate::m2web) m2web_server: String,
     /// The LAN devices connected to the eWON.
-    lan_devices: Vec<String>,
+    pub(in crate::m2web) lan_devices: Vec<String>,
     /// The active eWON services.
-    ewon_services: Vec<String>,
+    pub(in crate::m2web) ewon_services: Vec<String>,
 }
 
 /// The current status of the eWON, either connected or disconnected.
