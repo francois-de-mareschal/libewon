@@ -96,26 +96,6 @@ mod test {
     };
 
     #[tokio::test]
-    async fn client_connect_to_api_base_url() -> Result<(), reqwest::Error> {
-        let server = MockServer::start().await;
-        let server_uri = &server.uri();
-
-        let client = client::ClientBuilder::default()
-            .t2m_url(server_uri)
-            .build()
-            .unwrap();
-        Mock::given(method("GET"))
-            .respond_with(ResponseTemplate::new(200))
-            .mount(&server)
-            .await;
-        let status = client.http_client.get(server_uri).send().await?.status();
-
-        assert_eq!(status, reqwest::StatusCode::OK);
-
-        Ok(())
-    }
-
-    #[tokio::test]
     async fn get_ewons_empty_ok() -> Result<(), error::Error> {
         let server = MockServer::start().await;
         let server_uri = format!("{}/t2mapi", &server.uri());
