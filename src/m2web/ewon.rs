@@ -7,7 +7,6 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Serialize, Deserialize)]
 pub(in crate::m2web) struct ApiResponse {
     /// Indicates if the request suceeded or not.
-    #[serde(default)]
     pub(in crate::m2web) success: bool,
     /// A specific eWON have been requested from the API.
     #[serde(default)]

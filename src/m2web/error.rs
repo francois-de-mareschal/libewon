@@ -84,8 +84,9 @@ impl convert::From<serde_json::Error> for Error {
             Error {
                 code: 500,
                 kind: ErrorKind::ResponseParsing(format!(
-                    "Processing of the JSON response started before the full response was received: {}",
-                    error)),
+                    "An empty or incomplete response were received: {}",
+                    error
+                )),
             }
         } else {
             Error {
