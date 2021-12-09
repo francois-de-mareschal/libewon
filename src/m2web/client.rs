@@ -25,12 +25,46 @@ pub struct Client<'a> {
     /// The Talk2M API key used to check the user is authorized to use the API.
     #[builder(default = "\"731e38ec-981f-4f31-9cb5-e87f0d571816\"")]
     t2m_developer_id: &'a str,
+    /// Athenticate statefully or not.
+    #[builder(default = "false")]
+    stateful_auth: bool,
+    /// Session id returned by the API in case of successful authentication.
+    #[builder(default = "None", setter(skip))]
+    t2m_session: Option<String>,
     /// HTTP client to connect to the API.
-    #[builder(setter(strip_option), default = "reqwest::Client::new()")]
+    #[builder(setter(strip_option, skip), default = "reqwest::Client::new()")]
     http_client: HttpClient,
 }
 
 impl<'a> Client<'a> {
+    /// Open a stateful session.
+    ///
+    /// To remain compatible with potential legacy code which could use the stateful authentication, authenticate
+    /// statefully against the M2Web API. The API will return a session id which will be the API key for subsequent
+    /// calls of to the API.
+    ///
+    /// # Exemple
+    /// ```rust
+    /// # use libewon::m2web::{client::ClientBuilder, error, ewon::Ewon};
+    /// # #[tokio::test]
+    /// # async fn open_t2m_session_ok() -> Result<(), error::Error> {
+    /// let client = ClientBuilder::default().stateful_auth(true).build()?;
+    /// let _ = client.login()?;
+    ///
+    /// // Do something useful, for example:
+    /// let ewons = client.get_ewons(None)?;
+    /// # client.logout();
+    /// # }
+    /// ```
+    pub async fn login(&self) -> Result<&'a str, error::Error> {
+        Err(error::Error {
+            code: 403,
+            kind: error::ErrorKind::InvalidCredentials(
+                "Unable to open a session: Invalid credentials".to_string(),
+            ),
+        })
+    }
+
     /// Return the list of all eWONs registered for the corporate account.
     ///
     /// The M2Web API allows to get the list of all eWONs associated to the corporate account used
@@ -307,6 +341,140 @@ mod test {
                 ))
             },
             ewons
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn config_stateful_login_ko() -> Result<(), error::Error> {
+        let server = MockServer::start().await;
+        let server_uri = format!("{}/t2mapi", &server.uri());
+        let client = client::ClientBuilder::default()
+            .t2m_url(&server_uri)
+            .stateful_auth(true)
+            .build()
+            .unwrap();
+
+        let json_response = json!({
+          "code": 403,
+          "message": "Invalid credentials",
+          "success": false
+        });
+
+        Mock::given(method("GET"))
+            .and(query_param("t2maccount", "account1"))
+            .and(query_param("t2musername", "username1"))
+            .and(query_param("t2mpassword", "password1"))
+            .and(query_param(
+                "t2mdeveloperid",
+                "731e38ec-981f-4f31-9cb5-e87f0d571816",
+            ))
+            .and(path("/t2mapi/login"))
+            .respond_with(ResponseTemplate::new(403).set_body_json(&json_response))
+            .mount(&server)
+            .await;
+
+        let session_id = match client.login().await {
+            Ok(_) => {
+                panic!("client.login().await should had returned an error::InvalidCredentials")
+            }
+            Err(err) => err,
+        };
+
+        assert_eq!(
+            session_id,
+            error::Error {
+                code: 403,
+                kind: error::ErrorKind::InvalidCredentials(
+                    "Unable to open a session: Invalid credentials".to_string()
+                ),
+            }
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn config_stateful_login_ok() -> Result<(), error::Error> {
+        let server = MockServer::start().await;
+        let server_uri = format!("{}/t2mapi", &server.uri());
+        let client = client::ClientBuilder::default()
+            .t2m_url(&server_uri)
+            .t2m_account("account2")
+            .t2m_username("username2")
+            .t2m_password("password2")
+            .t2m_developer_id("795f1844-2f5e-4d8b-9922-25c45d3e1c47")
+            .stateful_auth(true)
+            .build()
+            .unwrap();
+
+        let json_response = json!({
+          "t2msession": "e44be62aaa9381707b5ab328c18d4a43",
+          "success": true
+        });
+
+        Mock::given(method("GET"))
+            .and(query_param("t2maccount", "account2"))
+            .and(query_param("t2musername", "username2"))
+            .and(query_param("t2mpassword", "password2"))
+            .and(query_param(
+                "t2mdeveloperid",
+                "795f1844-2f5e-4d8b-9922-25c45d3e1c47",
+            ))
+            .and(path("/t2mapi/login"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(&json_response))
+            .mount(&server)
+            .await;
+
+        let session_id = client.login().await?;
+
+        assert_eq!(session_id, "e44be62aaa9381707b5ab328c18d4a43");
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn config_stateless_login_ko() -> Result<(), error::Error> {
+        let server = MockServer::start().await;
+        let server_uri = format!("{}/t2mapi", &server.uri());
+        let client = client::ClientBuilder::default()
+            .t2m_url(&server_uri)
+            .build()
+            .unwrap();
+
+        let json_response = json!({
+          "code": 403,
+          "message": "Invalid credentials",
+          "success": false
+        });
+
+        Mock::given(method("GET"))
+            .and(query_param("t2maccount", "account1"))
+            .and(query_param("t2musername", "username1"))
+            .and(query_param("t2mpassword", "password1"))
+            .and(query_param(
+                "t2mdeveloperid",
+                "731e38ec-981f-4f31-9cb5-e87f0d571816",
+            ))
+            .and(path("/t2mapi/login"))
+            .respond_with(ResponseTemplate::new(403).set_body_json(&json_response))
+            .mount(&server)
+            .await;
+
+        let session_id = match client.login().await {
+            Ok(_) => {
+                panic!("client.login().await should had returned an error::StatelessAuthSet")
+            }
+            Err(err) => err,
+        };
+
+        assert_eq!(
+            session_id,
+            error::Error {
+                code: 500,
+                kind: error::ErrorKind::InvalidCredentials("stateful_auth was not set".to_string()),
+            }
         );
 
         Ok(())

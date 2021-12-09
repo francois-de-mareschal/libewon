@@ -14,6 +14,12 @@ pub(in crate::m2web) struct ApiResponse {
     /// All eWON or eWON from a pool have been requested from the API.
     #[serde(default)]
     pub(in crate::m2web) ewons: Vec<Ewon>,
+    /// Session id returned by the API in case of stateful auth.
+    #[serde(default)]
+    pub(in crate::m2web) t2msession: String,
+    /// Message to explain which error just happened.
+    #[serde(default)]
+    pub(in crate::m2web) message: String,
 }
 
 /// eWON parameters.
