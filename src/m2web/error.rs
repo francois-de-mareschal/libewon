@@ -15,10 +15,14 @@ pub struct Error {
 pub enum ErrorKind {
     /// This error occurs when one of the authentication parameters provided to the M2Web API is wrong.
     InvalidCredentials(String),
+    /// This error occurs when a mandatory parameter is missing.
+    MissingParameter(String),
     /// This error occurs when the API returns an empty response.
     NoContent(String),
     /// This error occurs when the API client is unable to parse and deserialize the JSON response from the API.
     ResponseParsing(String),
+    /// This error occurs when the client tries to auth statefully without the stateful_auth field set.
+    StatelessAuthSet(String),
     /// This is a generic error when an unknown error occurred.
     UnknownError(String),
 }
@@ -32,11 +36,21 @@ impl fmt::Display for Error {
             ErrorKind::InvalidCredentials(ref error_message) => {
                 write!(f, "HTTP {}: {}", self.code, error_message)
             }
+            ErrorKind::MissingParameter(ref error_message) => {
+                write!(f, "HTTP {}: {}", self.code, error_message)
+            }
             ErrorKind::NoContent(ref error_message) => {
                 write!(f, "HTTP {}: {}", self.code, error_message)
             }
             ErrorKind::ResponseParsing(ref error_message) => {
                 write!(f, "Unable to parse JSON response: {}", error_message)
+            }
+            ErrorKind::StatelessAuthSet(ref error_message) => {
+                write!(
+                    f,
+                    "Client set to authenticate statelessly: {}",
+                    error_message
+                )
             }
             ErrorKind::UnknownError(ref error_message) => {
                 write!(f, "Unknown error: {}", error_message)
