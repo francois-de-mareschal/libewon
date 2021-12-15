@@ -15,6 +15,8 @@ pub struct Error {
 pub enum ErrorKind {
     /// This error occurs when one of the authentication parameters provided to the M2Web API is wrong.
     InvalidCredentials(String),
+    /// This error occurs when a mandatory parameter is missing.
+    MissingParameter(String),
     /// This error occurs when the API returns an empty response.
     NoContent(String),
     /// This error occurs when the API client is unable to parse and deserialize the JSON response from the API.
@@ -32,6 +34,9 @@ impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self.kind {
             ErrorKind::InvalidCredentials(ref error_message) => {
+                write!(f, "HTTP {}: {}", self.code, error_message)
+            }
+            ErrorKind::MissingParameter(ref error_message) => {
                 write!(f, "HTTP {}: {}", self.code, error_message)
             }
             ErrorKind::NoContent(ref error_message) => {

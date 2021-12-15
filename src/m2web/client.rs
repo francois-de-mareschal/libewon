@@ -56,11 +56,27 @@ impl<'a> Client<'a> {
     /// # client.logout();
     /// # }
     /// ```
-    pub async fn login(&self) -> Result<&'a str, error::Error> {
+    pub async fn login(&mut self) -> Result<&str, error::Error> {
+        // Check if the user set the stateful auth.
+        if !self.stateful_auth {
+            return Err(error::Error {
+                code: 500,
+                kind: error::ErrorKind::StatelessAuthSet("stateful_auth was not set".to_string()),
+            });
+        }
+
+        let api_response = self.request_api("login", None).await?;
+
+        self.t2m_session = Some(api_response.t2msession.to_owned());
+
+        Ok(&self.t2m_session.as_ref().unwrap())
+    }
+
+    pub async fn logout(&self) -> Result<(), error::Error> {
         Err(error::Error {
             code: 403,
             kind: error::ErrorKind::InvalidCredentials(
-                "Unable to open a session: Invalid credentials".to_string(),
+                "Unable to close the session: invalid session id".to_string(),
             ),
         })
     }
@@ -92,22 +108,8 @@ impl<'a> Client<'a> {
     /// # }
     /// ```
     pub async fn get_ewons(&self, pool: Option<&str>) -> Result<Vec<Ewon>, error::Error> {
-        let api_response = self
-            .http_client
-            .get(format!("{}/{}", self.t2m_url, "getewons"))
-            .query(&vec![
-                ("t2maccount", self.t2m_account),
-                ("t2musername", self.t2m_username),
-                ("t2mpassword", self.t2m_password),
-                ("t2mdeveloperid", self.t2m_developer_id),
-                ("pool", pool.unwrap_or_default()),
-            ])
-            .send()
-            .await?
-            .text()
-            .await?;
-
-        let api_response = serde_json::from_str::<ApiResponse>(&api_response)?;
+        let query_params = vec![("pool", pool.unwrap_or_default())];
+        let api_response = self.request_api("getewons", Some(query_params)).await?;
 
         if api_response.ewons.is_empty() {
             Err(error::Error {
@@ -116,6 +118,55 @@ impl<'a> Client<'a> {
             })
         } else {
             Ok(api_response.ewons)
+        }
+    }
+
+    /// Perform the request and check the HTTP error codes.
+    async fn request_api(
+        &self,
+        url_path: &str,
+        req_query_params: Option<Vec<(&str, &str)>>,
+    ) -> Result<ApiResponse, error::Error> {
+        let query_params = &mut vec![
+            ("t2maccount", self.t2m_account),
+            ("t2musername", self.t2m_username),
+            ("t2mpassword", self.t2m_password),
+            ("t2mdeveloperid", self.t2m_developer_id),
+        ];
+
+        if let Some(ref additional_query_params) = req_query_params {
+            additional_query_params
+                .iter()
+                .for_each(|param| query_params.push(param.to_owned()));
+        }
+
+        let http_response = self
+            .http_client
+            .get(format!("{}/{}", self.t2m_url, url_path))
+            .query(query_params)
+            .send()
+            .await?;
+
+        let http_status = http_response.status();
+        let http_body = http_response.text().await?;
+        let api_response = serde_json::from_str::<ApiResponse>(&http_body)?;
+
+        match api_response.success {
+            true => Ok(api_response),
+            false => match http_status {
+                reqwest::StatusCode::BAD_REQUEST => Err(error::Error {
+                    code: http_status.as_u16(),
+                    kind: error::ErrorKind::MissingParameter(format!("{}", api_response.message)),
+                }),
+                reqwest::StatusCode::FORBIDDEN => Err(error::Error {
+                    code: http_status.as_u16(),
+                    kind: error::ErrorKind::InvalidCredentials(format!("{}", api_response.message)),
+                }),
+                _ => Err(error::Error {
+                    code: 500,
+                    kind: error::ErrorKind::UnknownError("Unkown error occurred".to_string()),
+                }),
+            },
         }
     }
 }
@@ -350,7 +401,7 @@ mod test {
     async fn config_stateful_login_ko() -> Result<(), error::Error> {
         let server = MockServer::start().await;
         let server_uri = format!("{}/t2mapi", &server.uri());
-        let client = client::ClientBuilder::default()
+        let mut client = client::ClientBuilder::default()
             .t2m_url(&server_uri)
             .stateful_auth(true)
             .build()
@@ -386,9 +437,7 @@ mod test {
             session_id,
             error::Error {
                 code: 403,
-                kind: error::ErrorKind::InvalidCredentials(
-                    "Unable to open a session: Invalid credentials".to_string()
-                ),
+                kind: error::ErrorKind::InvalidCredentials("Invalid credentials".to_string()),
             }
         );
 
@@ -399,7 +448,7 @@ mod test {
     async fn config_stateful_login_ok() -> Result<(), error::Error> {
         let server = MockServer::start().await;
         let server_uri = format!("{}/t2mapi", &server.uri());
-        let client = client::ClientBuilder::default()
+        let mut client = client::ClientBuilder::default()
             .t2m_url(&server_uri)
             .t2m_account("account2")
             .t2m_username("username2")
@@ -438,7 +487,7 @@ mod test {
     async fn config_stateless_login_ko() -> Result<(), error::Error> {
         let server = MockServer::start().await;
         let server_uri = format!("{}/t2mapi", &server.uri());
-        let client = client::ClientBuilder::default()
+        let mut client = client::ClientBuilder::default()
             .t2m_url(&server_uri)
             .build()
             .unwrap();
@@ -473,7 +522,7 @@ mod test {
             session_id,
             error::Error {
                 code: 500,
-                kind: error::ErrorKind::InvalidCredentials("stateful_auth was not set".to_string()),
+                kind: error::ErrorKind::StatelessAuthSet("stateful_auth was not set".to_string()),
             }
         );
 
