@@ -43,17 +43,17 @@ impl<'a> Client<'a> {
     /// statefully against the M2Web API. The API will return a session id which will be the API key for subsequent
     /// calls of to the API.
     ///
-    /// # Exemple
+    /// # Example
     /// ```rust
     /// # use libewon::m2web::{client::ClientBuilder, error, ewon::Ewon};
     /// # #[tokio::test]
     /// # async fn open_t2m_session_ok() -> Result<(), error::Error> {
     /// let client = ClientBuilder::default().stateful_auth(true).build()?;
-    /// let _ = client.login()?;
+    /// let _ = client.login().await?;
     ///
     /// // Do something useful, for example:
-    /// let ewons = client.get_ewons(None)?;
-    /// # client.logout();
+    /// let ewons = client.get_ewons(None).await?;
+    /// # client.logout().await?;
     /// # }
     /// ```
     pub async fn login(&mut self) -> Result<&str, error::Error> {
@@ -66,19 +66,47 @@ impl<'a> Client<'a> {
         }
 
         let api_response = self.request_api("login", None).await?;
-
         self.t2m_session = Some(api_response.t2msession.to_owned());
 
         Ok(&self.t2m_session.as_ref().unwrap())
     }
 
-    pub async fn logout(&self) -> Result<(), error::Error> {
-        Err(error::Error {
-            code: 403,
-            kind: error::ErrorKind::InvalidCredentials(
-                "Unable to close the session: invalid session id".to_string(),
-            ),
-        })
+    /// Close a stateful session.
+    ///
+    /// Close the session once the querying of the API is complete. CLosing the session invalidates the
+    /// session id and set it to `None`. All subsequent calls to the API will fail, unless `login()` is
+    /// called again to get a new session id.
+    ///
+    /// To avoid the client to be called after a logout, the `logout()` methods consumes the `client`.
+    ///
+    /// # Example
+    /// ```rust
+    /// # use libewon::m2web::{client::ClientBuilder, error, ewon::Ewon};
+    /// # #[tokio::test]
+    /// # async fn close_t2m_session_ok() -> Result<(), error::Error> {
+    /// let client = ClientBuilder::default().stateful_auth(true).build()?;
+    /// let _ = client.login().await?;
+    ///
+    /// // Do something useful, for example:
+    /// let ewons = client.get_ewons(None).await?;
+    ///
+    /// // All subsequent calls to the API will fail.
+    /// client.logout().await?;
+    /// # }
+    /// ```
+    pub async fn logout(mut self) -> Result<(), error::Error> {
+        // Check if the user set the stateful auth.
+        if !self.stateful_auth {
+            return Err(error::Error {
+                code: 500,
+                kind: error::ErrorKind::StatelessAuthSet("stateful_auth was not set".to_string()),
+            });
+        }
+
+        let _ = self.request_api("logout", None).await?;
+        self.t2m_session = None;
+
+        Ok(())
     }
 
     /// Return the list of all eWONs registered for the corporate account.
@@ -114,7 +142,7 @@ impl<'a> Client<'a> {
         if api_response.ewons.is_empty() {
             Err(error::Error {
                 code: 204,
-                kind: error::ErrorKind::NoContent(String::from("No eWON were returned by API")),
+                kind: error::ErrorKind::NoContent("No eWON were returned by API".to_string()),
             })
         } else {
             Ok(api_response.ewons)
@@ -251,7 +279,7 @@ mod test {
         assert_eq!(
             error::Error {
                 code: 204,
-                kind: error::ErrorKind::NoContent(String::from("No eWON were returned by API"))
+                kind: error::ErrorKind::NoContent("No eWON were returned by API".to_string())
             },
             ewons
         );
@@ -558,5 +586,25 @@ mod test {
         );
 
         Ok(())
+    }
+
+    #[tokio::test]
+    async fn config_stateful_logout_ok() -> Result<(), error::Error> {
+        todo!()
+    }
+
+    #[tokio::test]
+    async fn config_stateful_logout_ko_wrong_session_id() -> Result<(), error::Error> {
+        todo!()
+    }
+
+    #[tokio::test]
+    async fn config_stateful_logout_ko_no_session_id() -> Result<(), error::Error> {
+        todo!()
+    }
+
+    #[tokio::test]
+    async fn config_stateless_logout_ko() -> Result<(), error::Error> {
+        todo!()
     }
 }

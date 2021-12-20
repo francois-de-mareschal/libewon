@@ -9,15 +9,23 @@
 //!
 //! # Example
 //! ```rust
-//! # use libewon::m2web::client::ClientBuilder;
-//! let _client = ClientBuilder::default()
+//! # use libewon::m2web::{client::ClientBuilder, error, ewon::Ewon};
+//! # #[tokio::test]
+//! # async fn general_stateless_auth_example_ok() -> Result<(), error::Error> {
+//! let client = ClientBuilder::default()
 //!     .t2m_url("https://m2web.talk2m.com/t2mapi")
 //!     .t2m_account("account1")
 //!     .t2m_username("username1")
 //!     .t2m_password("password1")
 //!     .t2m_developer_id("731e38ec-981f-4f31-9cb5-e87f0d571816")
-//!     .build()
-//!     .unwrap();
+//!     .build()?;
+//!
+//! // Do someting useful.
+//! let ewons = client.get_ewons(None).await?;
+//! ewons
+//!     .iter()
+//!     .for_each(|ewon| println!(format!("#{}: {}", ewon.id, ewon.name)));
+//! # }
 //! ```
 
 pub mod m2web;
