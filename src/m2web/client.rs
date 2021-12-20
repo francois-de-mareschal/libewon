@@ -127,12 +127,43 @@ impl<'a> Client<'a> {
         url_path: &str,
         req_query_params: Option<Vec<(&str, &str)>>,
     ) -> Result<ApiResponse, error::Error> {
-        let query_params = &mut vec![
-            ("t2maccount", self.t2m_account),
-            ("t2musername", self.t2m_username),
-            ("t2mpassword", self.t2m_password),
-            ("t2mdeveloperid", self.t2m_developer_id),
-        ];
+        // Check if the auth is stateful or not.
+        let mut query_params = match self.stateful_auth {
+            true => match url_path {
+                // In case of stateful request, check if the user is performing a login.
+                "login" => vec![
+                    ("t2maccount", self.t2m_account),
+                    ("t2musername", self.t2m_username),
+                    ("t2mpassword", self.t2m_password),
+                    ("t2mdeveloperid", self.t2m_developer_id),
+                ],
+                // If the user is querying anoter endpoint, return the session id.
+                _ => {
+                    if let Some(ref t2m_session) = self.t2m_session {
+                        vec![
+                            ("t2msessionid", t2m_session.as_ref()),
+                            ("t2mdeveloperid", self.t2m_developer_id),
+                        ]
+                    } else {
+                        // If the session id does not exist and the user is not performin a login, return an error.
+                        return Err(error::Error {
+                            code: 403,
+                            kind: error::ErrorKind::InvalidCredentials(
+                                "No session opened, please login before requesting the API"
+                                    .to_string(),
+                            ),
+                        });
+                    }
+                }
+            },
+            // Return stateless authentication parameters.
+            false => vec![
+                ("t2maccount", self.t2m_account),
+                ("t2musername", self.t2m_username),
+                ("t2mpassword", self.t2m_password),
+                ("t2mdeveloperid", self.t2m_developer_id),
+            ],
+        };
 
         if let Some(ref additional_query_params) = req_query_params {
             additional_query_params
@@ -143,7 +174,7 @@ impl<'a> Client<'a> {
         let http_response = self
             .http_client
             .get(format!("{}/{}", self.t2m_url, url_path))
-            .query(query_params)
+            .query(&query_params)
             .send()
             .await?;
 
