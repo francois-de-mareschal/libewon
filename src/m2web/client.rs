@@ -549,32 +549,7 @@ mod test {
 
     #[tokio::test]
     async fn config_stateless_login_ko() -> Result<(), error::Error> {
-        let server = MockServer::start().await;
-        let server_uri = format!("{}/t2mapi", &server.uri());
-        let mut client = client::ClientBuilder::default()
-            .t2m_url(&server_uri)
-            .build()
-            .unwrap();
-
-        let json_response = json!({
-          "code": 403,
-          "message": "Invalid credentials",
-          "success": false
-        });
-
-        Mock::given(method("GET"))
-            .and(query_param("t2maccount", "account1"))
-            .and(query_param("t2musername", "username1"))
-            .and(query_param("t2mpassword", "password1"))
-            .and(query_param(
-                "t2mdeveloperid",
-                "731e38ec-981f-4f31-9cb5-e87f0d571816",
-            ))
-            .and(path("/t2mapi/login"))
-            .respond_with(ResponseTemplate::new(403).set_body_json(&json_response))
-            .expect(0)
-            .mount(&server)
-            .await;
+        let mut client = client::ClientBuilder::default().build().unwrap();
 
         let session_id = match client.login().await {
             Ok(_) => {
@@ -800,6 +775,23 @@ mod test {
 
     #[tokio::test]
     async fn config_stateless_logout_ko() -> Result<(), error::Error> {
-        todo!()
+        let client = client::ClientBuilder::default().build().unwrap();
+
+        let session_id = match client.logout().await {
+            Ok(_) => {
+                panic!("client.login().await should had returned an error::StatelessAuthSet")
+            }
+            Err(err) => err,
+        };
+
+        assert_eq!(
+            session_id,
+            error::Error {
+                code: 500,
+                kind: error::ErrorKind::StatelessAuthSet("stateful_auth was not set".to_string()),
+            }
+        );
+
+        Ok(())
     }
 }
