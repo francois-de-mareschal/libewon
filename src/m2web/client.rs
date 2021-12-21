@@ -43,17 +43,17 @@ impl<'a> Client<'a> {
     /// statefully against the M2Web API. The API will return a session id which will be the API key for subsequent
     /// calls of to the API.
     ///
-    /// # Exemple
+    /// # Example
     /// ```rust
     /// # use libewon::m2web::{client::ClientBuilder, error, ewon::Ewon};
     /// # #[tokio::test]
     /// # async fn open_t2m_session_ok() -> Result<(), error::Error> {
     /// let client = ClientBuilder::default().stateful_auth(true).build()?;
-    /// let _ = client.login()?;
+    /// let _ = client.login().await?;
     ///
     /// // Do something useful, for example:
-    /// let ewons = client.get_ewons(None)?;
-    /// # client.logout();
+    /// let ewons = client.get_ewons(None).await?;
+    /// # client.logout().await?;
     /// # }
     /// ```
     pub async fn login(&mut self) -> Result<&str, error::Error> {
@@ -66,19 +66,47 @@ impl<'a> Client<'a> {
         }
 
         let api_response = self.request_api("login", None).await?;
-
         self.t2m_session = Some(api_response.t2msession.to_owned());
 
         Ok(&self.t2m_session.as_ref().unwrap())
     }
 
-    pub async fn logout(&self) -> Result<(), error::Error> {
-        Err(error::Error {
-            code: 403,
-            kind: error::ErrorKind::InvalidCredentials(
-                "Unable to close the session: invalid session id".to_string(),
-            ),
-        })
+    /// Close a stateful session.
+    ///
+    /// Close the session once the querying of the API is complete. CLosing the session invalidates the
+    /// session id and set it to `None`. All subsequent calls to the API will fail, unless `login()` is
+    /// called again to get a new session id.
+    ///
+    /// To avoid the client to be called after a logout, the `logout()` methods consumes the `client`.
+    ///
+    /// # Example
+    /// ```rust
+    /// # use libewon::m2web::{client::ClientBuilder, error, ewon::Ewon};
+    /// # #[tokio::test]
+    /// # async fn close_t2m_session_ok() -> Result<(), error::Error> {
+    /// let client = ClientBuilder::default().stateful_auth(true).build()?;
+    /// let _ = client.login().await?;
+    ///
+    /// // Do something useful, for example:
+    /// let ewons = client.get_ewons(None).await?;
+    ///
+    /// // All subsequent calls to the API will fail.
+    /// client.logout().await?;
+    /// # }
+    /// ```
+    pub async fn logout(mut self) -> Result<(), error::Error> {
+        // Check if the user set the stateful auth.
+        if !self.stateful_auth {
+            return Err(error::Error {
+                code: 500,
+                kind: error::ErrorKind::StatelessAuthSet("stateful_auth was not set".to_string()),
+            });
+        }
+
+        let _ = self.request_api("logout", None).await?;
+        self.t2m_session = None;
+
+        Ok(())
     }
 
     /// Return the list of all eWONs registered for the corporate account.
@@ -114,7 +142,7 @@ impl<'a> Client<'a> {
         if api_response.ewons.is_empty() {
             Err(error::Error {
                 code: 204,
-                kind: error::ErrorKind::NoContent(String::from("No eWON were returned by API")),
+                kind: error::ErrorKind::NoContent("No eWON were returned by API".to_string()),
             })
         } else {
             Ok(api_response.ewons)
@@ -127,12 +155,43 @@ impl<'a> Client<'a> {
         url_path: &str,
         req_query_params: Option<Vec<(&str, &str)>>,
     ) -> Result<ApiResponse, error::Error> {
-        let query_params = &mut vec![
-            ("t2maccount", self.t2m_account),
-            ("t2musername", self.t2m_username),
-            ("t2mpassword", self.t2m_password),
-            ("t2mdeveloperid", self.t2m_developer_id),
-        ];
+        // Check if the auth is stateful or not.
+        let mut query_params = match self.stateful_auth {
+            true => match url_path {
+                // In case of stateful request, check if the user is performing a login.
+                "login" => vec![
+                    ("t2maccount", self.t2m_account),
+                    ("t2musername", self.t2m_username),
+                    ("t2mpassword", self.t2m_password),
+                    ("t2mdeveloperid", self.t2m_developer_id),
+                ],
+                // If the user is querying anoter endpoint, return the session id.
+                _ => {
+                    if let Some(ref t2m_session) = self.t2m_session {
+                        vec![
+                            ("t2msession", t2m_session.as_ref()),
+                            ("t2mdeveloperid", self.t2m_developer_id),
+                        ]
+                    } else {
+                        // If the session id does not exist and the user is not performin a login, return an error.
+                        return Err(error::Error {
+                            code: 403,
+                            kind: error::ErrorKind::InvalidCredentials(
+                                "No session opened, please login before requesting the API"
+                                    .to_string(),
+                            ),
+                        });
+                    }
+                }
+            },
+            // Return stateless authentication parameters.
+            false => vec![
+                ("t2maccount", self.t2m_account),
+                ("t2musername", self.t2m_username),
+                ("t2mpassword", self.t2m_password),
+                ("t2mdeveloperid", self.t2m_developer_id),
+            ],
+        };
 
         if let Some(ref additional_query_params) = req_query_params {
             additional_query_params
@@ -143,7 +202,7 @@ impl<'a> Client<'a> {
         let http_response = self
             .http_client
             .get(format!("{}/{}", self.t2m_url, url_path))
-            .query(query_params)
+            .query(&query_params)
             .send()
             .await?;
 
@@ -209,6 +268,7 @@ mod test {
             .and(query_param("pool", ""))
             .and(path("/t2mapi/getewons"))
             .respond_with(ResponseTemplate::new(200).set_body_json(&json_response))
+            .expect(1)
             .mount(&server)
             .await;
 
@@ -220,7 +280,7 @@ mod test {
         assert_eq!(
             error::Error {
                 code: 204,
-                kind: error::ErrorKind::NoContent(String::from("No eWON were returned by API"))
+                kind: error::ErrorKind::NoContent("No eWON were returned by API".to_string())
             },
             ewons
         );
@@ -288,6 +348,7 @@ mod test {
             .and(query_param("pool", ""))
             .and(path("/t2mapi/getewons"))
             .respond_with(ResponseTemplate::new(200).set_body_json(&json_response))
+            .expect(1)
             .mount(&server)
             .await;
 
@@ -376,6 +437,7 @@ mod test {
             .and(query_param("pool", ""))
             .and(path("/t2mapi/getewons"))
             .respond_with(ResponseTemplate::new(200).set_body_json(&json_response))
+            .expect(1)
             .mount(&server)
             .await;
 
@@ -423,6 +485,7 @@ mod test {
             ))
             .and(path("/t2mapi/login"))
             .respond_with(ResponseTemplate::new(403).set_body_json(&json_response))
+            .expect(1)
             .mount(&server)
             .await;
 
@@ -473,6 +536,7 @@ mod test {
             ))
             .and(path("/t2mapi/login"))
             .respond_with(ResponseTemplate::new(200).set_body_json(&json_response))
+            .expect(1)
             .mount(&server)
             .await;
 
@@ -485,33 +549,235 @@ mod test {
 
     #[tokio::test]
     async fn config_stateless_login_ko() -> Result<(), error::Error> {
+        let mut client = client::ClientBuilder::default().build().unwrap();
+
+        let session_id = match client.login().await {
+            Ok(_) => {
+                panic!("client.login().await should had returned an error::StatelessAuthSet")
+            }
+            Err(err) => err,
+        };
+
+        assert_eq!(
+            session_id,
+            error::Error {
+                code: 500,
+                kind: error::ErrorKind::StatelessAuthSet("stateful_auth was not set".to_string()),
+            }
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn config_stateful_logout_ok() -> Result<(), error::Error> {
         let server = MockServer::start().await;
         let server_uri = format!("{}/t2mapi", &server.uri());
         let mut client = client::ClientBuilder::default()
             .t2m_url(&server_uri)
+            .t2m_account("account2")
+            .t2m_username("username2")
+            .t2m_password("password2")
+            .t2m_developer_id("795f1844-2f5e-4d8b-9922-25c45d3e1c47")
+            .stateful_auth(true)
             .build()
             .unwrap();
 
-        let json_response = json!({
+        let json_response_login = json!({
+          "t2msession": "e44be62aaa9381707b5ab328c18d4a43",
+          "success": true
+        });
+
+        let json_response_logout = json!({
+            "success": true
+        });
+
+        Mock::given(method("GET"))
+            .and(query_param("t2maccount", "account2"))
+            .and(query_param("t2musername", "username2"))
+            .and(query_param("t2mpassword", "password2"))
+            .and(query_param(
+                "t2mdeveloperid",
+                "795f1844-2f5e-4d8b-9922-25c45d3e1c47",
+            ))
+            .and(path("/t2mapi/login"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(&json_response_login))
+            .expect(1)
+            .named("login")
+            .mount(&server)
+            .await;
+
+        Mock::given(method("GET"))
+            .and(query_param(
+                "t2msession",
+                "e44be62aaa9381707b5ab328c18d4a43",
+            ))
+            .and(query_param(
+                "t2mdeveloperid",
+                "795f1844-2f5e-4d8b-9922-25c45d3e1c47",
+            ))
+            .and(path("/t2mapi/logout"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(&json_response_logout))
+            .expect(1)
+            .named("logout")
+            .mount(&server)
+            .await;
+
+        let _ = client.login().await?;
+        client.logout().await?;
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn config_stateful_logout_ko_wrong_session_id() -> Result<(), error::Error> {
+        let server = MockServer::start().await;
+        let server_uri = format!("{}/t2mapi", &server.uri());
+        let mut client = client::ClientBuilder::default()
+            .t2m_url(&server_uri)
+            .t2m_account("account2")
+            .t2m_username("username2")
+            .t2m_password("password2")
+            .t2m_developer_id("795f1844-2f5e-4d8b-9922-25c45d3e1c47")
+            .stateful_auth(true)
+            .build()
+            .unwrap();
+
+        let json_response_login = json!({
+          "t2msession": "e44be62aaa9381707b5ab328c18d4a43",
+          "success": true
+        });
+
+        let json_response_logout = json!({
+          "message": "Session ID [0c94ef0b19b0c3b596115d4e5e1d2d02] is invalid",
           "code": 403,
-          "message": "Invalid credentials",
           "success": false
         });
 
         Mock::given(method("GET"))
-            .and(query_param("t2maccount", "account1"))
-            .and(query_param("t2musername", "username1"))
-            .and(query_param("t2mpassword", "password1"))
+            .and(query_param("t2maccount", "account2"))
+            .and(query_param("t2musername", "username2"))
+            .and(query_param("t2mpassword", "password2"))
             .and(query_param(
                 "t2mdeveloperid",
-                "731e38ec-981f-4f31-9cb5-e87f0d571816",
+                "795f1844-2f5e-4d8b-9922-25c45d3e1c47",
             ))
             .and(path("/t2mapi/login"))
-            .respond_with(ResponseTemplate::new(403).set_body_json(&json_response))
+            .respond_with(ResponseTemplate::new(200).set_body_json(&json_response_login))
+            .expect(1)
+            .named("login")
             .mount(&server)
             .await;
 
-        let session_id = match client.login().await {
+        Mock::given(method("GET"))
+            .and(query_param(
+                "t2msession",
+                "0c94ef0b19b0c3b596115d4e5e1d2d02",
+            ))
+            .and(query_param(
+                "t2mdeveloperid",
+                "795f1844-2f5e-4d8b-9922-25c45d3e1c47",
+            ))
+            .and(path("/t2mapi/logout"))
+            .respond_with(ResponseTemplate::new(403).set_body_json(&json_response_logout))
+            .expect(1)
+            .named("logout")
+            .mount(&server)
+            .await;
+
+        let _ = client.login().await?;
+        client.t2m_session = Some("0c94ef0b19b0c3b596115d4e5e1d2d02".to_string());
+        let logout = client.logout().await;
+
+        assert_eq!(
+            logout,
+            Err(error::Error {
+                code: 403,
+                kind: error::ErrorKind::InvalidCredentials(
+                    "Session ID [0c94ef0b19b0c3b596115d4e5e1d2d02] is invalid".to_string()
+                )
+            })
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn config_stateful_logout_ko_no_session_id() -> Result<(), error::Error> {
+        let server = MockServer::start().await;
+        let server_uri = format!("{}/t2mapi", &server.uri());
+        let mut client = client::ClientBuilder::default()
+            .t2m_url(&server_uri)
+            .t2m_account("account2")
+            .t2m_username("username2")
+            .t2m_password("password2")
+            .t2m_developer_id("795f1844-2f5e-4d8b-9922-25c45d3e1c47")
+            .stateful_auth(true)
+            .build()
+            .unwrap();
+
+        let json_response_login = json!({
+          "t2msession": "e44be62aaa9381707b5ab328c18d4a43",
+          "success": true
+        });
+
+        let json_response_logout = json!({
+          "success": true
+        });
+
+        Mock::given(method("GET"))
+            .and(query_param("t2maccount", "account2"))
+            .and(query_param("t2musername", "username2"))
+            .and(query_param("t2mpassword", "password2"))
+            .and(query_param(
+                "t2mdeveloperid",
+                "795f1844-2f5e-4d8b-9922-25c45d3e1c47",
+            ))
+            .and(path("/t2mapi/login"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(&json_response_login))
+            .expect(1)
+            .named("login")
+            .mount(&server)
+            .await;
+
+        Mock::given(method("GET"))
+            .and(query_param(
+                "t2msession",
+                "e44be62aaa9381707b5ab328c18d4a43",
+            ))
+            .and(query_param(
+                "t2mdeveloperid",
+                "795f1844-2f5e-4d8b-9922-25c45d3e1c47",
+            ))
+            .and(path("/t2mapi/logout"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(&json_response_logout))
+            .expect(0)
+            .named("logout")
+            .mount(&server)
+            .await;
+
+        let _ = client.login().await?;
+        client.t2m_session = None;
+        let logout = client.logout().await;
+
+        assert_eq!(
+            logout,
+            Err(error::Error {
+                code: 403,
+                kind: error::ErrorKind::InvalidCredentials(
+                    "No session opened, please login before requesting the API".to_string(),
+                ),
+            })
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn config_stateless_logout_ko() -> Result<(), error::Error> {
+        let client = client::ClientBuilder::default().build().unwrap();
+
+        let session_id = match client.logout().await {
             Ok(_) => {
                 panic!("client.login().await should had returned an error::StatelessAuthSet")
             }
