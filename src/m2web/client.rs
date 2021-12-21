@@ -149,6 +149,57 @@ impl<'a> Client<'a> {
         }
     }
 
+    /// Return the eWON selected by its name.
+    ///
+    /// Get the eWON selected by its name and only this one. The name have to be the exact
+    /// name of the eWON, like returned by `get_ewons()`.
+    ///
+    /// # Example
+    /// ```rust
+    /// # use libewon::m2web::{client::ClientBuilder, error, ewon::Ewon};
+    /// # #[tokio::test]
+    /// # async fn get_one_ewon_by_name() -> Result<Vec<Ewon>, error::Error> {
+    /// // Get all eWONs belonging to the corporate account.
+    /// let client = ClientBuilder::default().build()?;
+    /// let ewon = client.get_ewon_by_name("ewon42").await?;
+    ///
+    /// // Do something useful, for example:
+    /// println!("eWON name: {}", ewon.name);
+    /// # }
+    /// ```
+    pub async fn get_ewon_by_name(&self, name: &str) -> Result<Ewon, error::Error> {
+        let query_params = vec![("name", name)];
+        let api_response = self.request_api("getewon", Some(query_params)).await?;
+
+        Ok(api_response.ewon)
+    }
+
+    /// Return the eWON selected by its id.
+    ///
+    /// Get the eWON selected by its id and only this one. The id have to be the exact
+    /// id of the eWON, like returned by `get_ewons()`.
+    ///
+    /// # Example
+    /// ```rust
+    /// # use libewon::m2web::{client::ClientBuilder, error, ewon::Ewon};
+    /// # #[tokio::test]
+    /// # async fn get_one_ewon_by_name() -> Result<Vec<Ewon>, error::Error> {
+    /// // Get all eWONs belonging to the corporate account.
+    /// let client = ClientBuilder::default().build()?;
+    /// let ewon = client.get_ewon_by_id(42).await?;
+    ///
+    /// // Do something useful, for example:
+    /// println!("eWON id: {}", ewon.id);
+    /// # }
+    /// ```
+    pub async fn get_ewon_by_id(&self, id: u32) -> Result<Ewon, error::Error> {
+        let id = id.to_string();
+        let query_params = vec![("id", id.as_ref())];
+        let api_response = self.request_api("getewon", Some(query_params)).await?;
+
+        Ok(api_response.ewon)
+    }
+
     /// Perform the request and check the HTTP error codes.
     async fn request_api(
         &self,
