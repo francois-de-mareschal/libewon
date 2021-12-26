@@ -149,6 +149,57 @@ impl<'a> Client<'a> {
         }
     }
 
+    /// Return the eWON selected by its name.
+    ///
+    /// Get the eWON selected by its name and only this one. The name have to be the exact
+    /// name of the eWON, like returned by `get_ewons()`.
+    ///
+    /// # Example
+    /// ```rust
+    /// # use libewon::m2web::{client::ClientBuilder, error, ewon::Ewon};
+    /// # #[tokio::test]
+    /// # async fn get_one_ewon_by_name() -> Result<Vec<Ewon>, error::Error> {
+    /// // Get all eWONs belonging to the corporate account.
+    /// let client = ClientBuilder::default().build()?;
+    /// let ewon = client.get_ewon_by_name("ewon42").await?;
+    ///
+    /// // Do something useful, for example:
+    /// println!("eWON name: {}", ewon.name);
+    /// # }
+    /// ```
+    pub async fn get_ewon_by_name(&self, name: &str) -> Result<Ewon, error::Error> {
+        let query_params = vec![("name", name)];
+        let api_response = self.request_api("getewon", Some(query_params)).await?;
+
+        Ok(api_response.ewon)
+    }
+
+    /// Return the eWON selected by its id.
+    ///
+    /// Get the eWON selected by its id and only this one. The id have to be the exact
+    /// id of the eWON, like returned by `get_ewons()`.
+    ///
+    /// # Example
+    /// ```rust
+    /// # use libewon::m2web::{client::ClientBuilder, error, ewon::Ewon};
+    /// # #[tokio::test]
+    /// # async fn get_one_ewon_by_name() -> Result<Vec<Ewon>, error::Error> {
+    /// // Get all eWONs belonging to the corporate account.
+    /// let client = ClientBuilder::default().build()?;
+    /// let ewon = client.get_ewon_by_id(42).await?;
+    ///
+    /// // Do something useful, for example:
+    /// println!("eWON id: {}", ewon.id);
+    /// # }
+    /// ```
+    pub async fn get_ewon_by_id(&self, id: u32) -> Result<Ewon, error::Error> {
+        let id = id.to_string();
+        let query_params = vec![("id", id.as_ref())];
+        let api_response = self.request_api("getewon", Some(query_params)).await?;
+
+        Ok(api_response.ewon)
+    }
+
     /// Perform the request and check the HTTP error codes.
     async fn request_api(
         &self,
@@ -220,6 +271,10 @@ impl<'a> Client<'a> {
                 reqwest::StatusCode::FORBIDDEN => Err(error::Error {
                     code: http_status.as_u16(),
                     kind: error::ErrorKind::InvalidCredentials(format!("{}", api_response.message)),
+                }),
+                reqwest::StatusCode::GONE => Err(error::Error {
+                    code: http_status.as_u16(),
+                    kind: error::ErrorKind::EmptyResponse(format!("{}", api_response.message)),
                 }),
                 _ => Err(error::Error {
                     code: 500,
@@ -789,6 +844,242 @@ mod test {
             error::Error {
                 code: 500,
                 kind: error::ErrorKind::StatelessAuthSet("stateful_auth was not set".to_string()),
+            }
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn get_ewon_by_id_empty_ok() -> Result<(), error::Error> {
+        let server = wiremock::MockServer::start().await;
+        let server_uri = format!("{}/t2mapi", &server.uri());
+        let client = client::ClientBuilder::default()
+            .t2m_url(&server_uri)
+            .t2m_account("account2")
+            .t2m_username("username2")
+            .t2m_password("password2")
+            .t2m_developer_id("795f1844-2f5e-4d8b-9922-25c45d3e1c47")
+            .build()
+            .unwrap();
+
+        let json_response = json!({
+          "message": "Device [] does not exist",
+          "code": 410,
+          "success": false
+        });
+
+        Mock::given(method("GET"))
+            .and(query_param("t2maccount", "account2"))
+            .and(query_param("t2musername", "username2"))
+            .and(query_param("t2mpassword", "password2"))
+            .and(query_param(
+                "t2mdeveloperid",
+                "795f1844-2f5e-4d8b-9922-25c45d3e1c47",
+            ))
+            .and(query_param("id", "42"))
+            .and(path("/t2mapi/getewon"))
+            .respond_with(ResponseTemplate::new(410).set_body_json(&json_response))
+            .expect(1)
+            .mount(&server)
+            .await;
+
+        let ewon = match client.get_ewon_by_id(42).await {
+            Ok(_) => panic!("get_ewon_by_id should have returned an error::Error 410"),
+            Err(err) => err,
+        };
+
+        assert_eq!(
+            ewon,
+            error::Error {
+                code: 410,
+                kind: error::ErrorKind::EmptyResponse("Device [] does not exist".to_string())
+            }
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn get_ewon_by_id_filled_ok() -> Result<(), error::Error> {
+        let server = wiremock::MockServer::start().await;
+        let server_uri = format!("{}/t2mapi", &server.uri());
+        let client = client::ClientBuilder::default()
+            .t2m_url(&server_uri)
+            .t2m_account("account2")
+            .t2m_username("username2")
+            .t2m_password("password2")
+            .t2m_developer_id("795f1844-2f5e-4d8b-9922-25c45d3e1c47")
+            .build()
+            .unwrap();
+
+        let json_response = json!({
+          "ewon": {
+            "id": 1206698,
+            "name": "bea-test",
+            "encodedName": "bea-test",
+            "status": "offline",
+            "description": "",
+            "customAttributes": [
+              "bea",
+              "",
+              ""
+            ],
+            "m2webServer": "eu2.m2web.talk2m.com",
+            "lanDevices": [],
+            "ewonServices": []
+            },
+          "success": true
+        });
+
+        Mock::given(method("GET"))
+            .and(query_param("t2maccount", "account2"))
+            .and(query_param("t2musername", "username2"))
+            .and(query_param("t2mpassword", "password2"))
+            .and(query_param(
+                "t2mdeveloperid",
+                "795f1844-2f5e-4d8b-9922-25c45d3e1c47",
+            ))
+            .and(query_param("id", "1206698"))
+            .and(path("/t2mapi/getewon"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(&json_response))
+            .expect(1)
+            .mount(&server)
+            .await;
+
+        let ewon = client.get_ewon_by_id(1206698).await?;
+
+        assert_eq!(
+            ewon,
+            ewon::Ewon {
+                id: 1206698,
+                name: "bea-test".to_string(),
+                encoded_name: "bea-test".to_string(),
+                status: "offline".to_string(),
+                description: "".to_string(),
+                custom_attributes: ["bea".to_string(), "".to_string(), "".to_string()],
+                m2web_server: "eu2.m2web.talk2m.com".to_string(),
+                lan_devices: vec![],
+                ewon_services: vec![],
+            }
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn get_ewon_by_name_empty_ok() -> Result<(), error::Error> {
+        let server = wiremock::MockServer::start().await;
+        let server_uri = format!("{}/t2mapi", &server.uri());
+        let client = client::ClientBuilder::default()
+            .t2m_url(&server_uri)
+            .t2m_account("account2")
+            .t2m_username("username2")
+            .t2m_password("password2")
+            .t2m_developer_id("795f1844-2f5e-4d8b-9922-25c45d3e1c47")
+            .build()
+            .unwrap();
+
+        let json_response = json!({
+          "message": "Device [missing42] does not exist",
+          "code": 410,
+          "success": false
+        });
+
+        Mock::given(method("GET"))
+            .and(query_param("t2maccount", "account2"))
+            .and(query_param("t2musername", "username2"))
+            .and(query_param("t2mpassword", "password2"))
+            .and(query_param(
+                "t2mdeveloperid",
+                "795f1844-2f5e-4d8b-9922-25c45d3e1c47",
+            ))
+            .and(query_param("name", "missing42"))
+            .and(path("/t2mapi/getewon"))
+            .respond_with(ResponseTemplate::new(410).set_body_json(&json_response))
+            .expect(1)
+            .mount(&server)
+            .await;
+
+        let ewon = match client.get_ewon_by_name("missing42").await {
+            Ok(_) => panic!("get_ewon_by_name should have returned an error::Error 410"),
+            Err(err) => err,
+        };
+
+        assert_eq!(
+            ewon,
+            error::Error {
+                code: 410,
+                kind: error::ErrorKind::EmptyResponse(
+                    "Device [missing42] does not exist".to_string()
+                )
+            }
+        );
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn get_ewon_by_name_filled_ok() -> Result<(), error::Error> {
+        let server = wiremock::MockServer::start().await;
+        let server_uri = format!("{}/t2mapi", &server.uri());
+        let client = client::ClientBuilder::default()
+            .t2m_url(&server_uri)
+            .t2m_account("account2")
+            .t2m_username("username2")
+            .t2m_password("password2")
+            .t2m_developer_id("795f1844-2f5e-4d8b-9922-25c45d3e1c47")
+            .build()
+            .unwrap();
+
+        let json_response = json!({
+          "ewon": {
+            "id": 1206698,
+            "name": "bea-test",
+            "encodedName": "bea-test",
+            "status": "offline",
+            "description": "",
+            "customAttributes": [
+              "bea",
+              "",
+              ""
+            ],
+            "m2webServer": "eu2.m2web.talk2m.com",
+            "lanDevices": [],
+            "ewonServices": []
+            },
+          "success": true
+        });
+
+        Mock::given(method("GET"))
+            .and(query_param("t2maccount", "account2"))
+            .and(query_param("t2musername", "username2"))
+            .and(query_param("t2mpassword", "password2"))
+            .and(query_param(
+                "t2mdeveloperid",
+                "795f1844-2f5e-4d8b-9922-25c45d3e1c47",
+            ))
+            .and(query_param("name", "bea-test"))
+            .and(path("/t2mapi/getewon"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(&json_response))
+            .expect(1)
+            .mount(&server)
+            .await;
+
+        let ewon = client.get_ewon_by_name("bea-test").await?;
+
+        assert_eq!(
+            ewon,
+            ewon::Ewon {
+                id: 1206698,
+                name: "bea-test".to_string(),
+                encoded_name: "bea-test".to_string(),
+                status: "offline".to_string(),
+                description: "".to_string(),
+                custom_attributes: ["bea".to_string(), "".to_string(), "".to_string()],
+                m2web_server: "eu2.m2web.talk2m.com".to_string(),
+                lan_devices: vec![],
+                ewon_services: vec![],
             }
         );
 
