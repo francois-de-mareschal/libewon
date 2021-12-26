@@ -272,6 +272,10 @@ impl<'a> Client<'a> {
                     code: http_status.as_u16(),
                     kind: error::ErrorKind::InvalidCredentials(format!("{}", api_response.message)),
                 }),
+                reqwest::StatusCode::GONE => Err(error::Error {
+                    code: http_status.as_u16(),
+                    kind: error::ErrorKind::EmptyResponse(format!("{}", api_response.message)),
+                }),
                 _ => Err(error::Error {
                     code: 500,
                     kind: error::ErrorKind::UnknownError("Unkown error occurred".to_string()),
