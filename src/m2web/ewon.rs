@@ -29,30 +29,21 @@ pub(in crate::m2web) struct ApiResponse {
 #[serde(rename_all = "camelCase")]
 pub struct Ewon {
     /// The UID of the eWON to the M2Web API.
-    pub(in crate::m2web) id: u32,
+    pub id: u32,
     /// The unique name of the eWON.
-    pub(in crate::m2web) name: String,
+    pub name: String,
     /// The url-encoded name of the eWON.
-    pub(in crate::m2web) encoded_name: String,
+    pub encoded_name: String,
     /// The status of the eWON, either connected or disconnected.
-    pub(in crate::m2web) status: String,
+    pub status: String,
     /// The user description of the eWON.
-    pub(in crate::m2web) description: String,
+    pub description: String,
     /// The three user-customized attributes of the eWON.
-    pub(in crate::m2web) custom_attributes: [String; 3],
+    pub custom_attributes: [String; 3],
     /// The M2Web VPN server on which the eWON is connected to.
-    pub(in crate::m2web) m2web_server: String,
+    pub m2web_server: String,
     /// The LAN devices connected to the eWON.
-    pub(in crate::m2web) lan_devices: Vec<String>,
+    pub lan_devices: Vec<String>,
     /// The active eWON services.
-    pub(in crate::m2web) ewon_services: Vec<String>,
-}
-
-/// The current status of the eWON, either connected or disconnected.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub enum EwonStatus {
-    /// The eWON is currently online.
-    Offline,
-    /// The eWON is currently offline.
-    Online,
+    pub ewon_services: Vec<String>,
 }
