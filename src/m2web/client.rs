@@ -206,6 +206,13 @@ impl<'a> Client<'a> {
         url_path: &str,
         req_query_params: Option<Vec<(&str, &str)>>,
     ) -> Result<ApiResponse, error::Error> {
+        // Check if the endpoint is provided.
+        if url_path.is_empty() {
+            return Err(error::Error {
+                code: 500,
+                kind: error::ErrorKind::InternalError("no API endpoint provided".to_string()),
+            });
+        }
         // Check if the auth is stateful or not.
         let mut query_params = match self.stateful_auth {
             true => match url_path {
@@ -266,12 +273,27 @@ impl<'a> Client<'a> {
             false => match http_status {
                 reqwest::StatusCode::BAD_REQUEST => Err(error::Error {
                     code: http_status.as_u16(),
-                    kind: error::ErrorKind::MissingParameter(format!("{}", api_response.message)),
+                    kind: error::ErrorKind::MissingOrWrongParameter(format!(
+                        "{}",
+                        api_response.message
+                    )),
                 }),
-                reqwest::StatusCode::FORBIDDEN => Err(error::Error {
-                    code: http_status.as_u16(),
-                    kind: error::ErrorKind::InvalidCredentials(format!("{}", api_response.message)),
-                }),
+                reqwest::StatusCode::FORBIDDEN => match api_response.message.as_ref() {
+                    "Invalid credentials" => Err(error::Error {
+                        code: http_status.as_u16(),
+                        kind: error::ErrorKind::InvalidCredentials(format!(
+                            "{}",
+                            api_response.message
+                        )),
+                    }),
+                    _ => Err(error::Error {
+                        code: 403,
+                        kind: error::ErrorKind::MissingOrWrongParameter(format!(
+                            "{}",
+                            api_response.message
+                        )),
+                    }),
+                },
                 reqwest::StatusCode::GONE => Err(error::Error {
                     code: http_status.as_u16(),
                     kind: error::ErrorKind::EmptyResponse(format!("{}", api_response.message)),
@@ -282,5 +304,81 @@ impl<'a> Client<'a> {
                 }),
             },
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::m2web::{client, error};
+    use serde_json::json;
+    use wiremock::{
+        matchers::{method, path, query_param},
+        Mock, MockServer, ResponseTemplate,
+    };
+
+    #[tokio::test]
+    async fn request_api_empty_endpoint_ko() {
+        let client = client::ClientBuilder::default().build().unwrap();
+        let api_response = match client.request_api("", None).await {
+            Ok(_) => panic!("client.request_api() should had returned an InternalError"),
+            Err(err) => err,
+        };
+
+        assert_eq!(
+            api_response,
+            error::Error {
+                code: 500,
+                kind: error::ErrorKind::InternalError("no API endpoint provided".to_string())
+            }
+        );
+    }
+
+    #[tokio::test]
+    async fn request_api_wrong_endpoint_ko() {
+        let server = MockServer::start().await;
+        let server_uri = format!("{}/{}", &server.uri(), "t2mapi");
+        let client = client::ClientBuilder::default()
+            .t2m_url(&server_uri)
+            .t2m_account("account2")
+            .t2m_username("username2")
+            .t2m_password("password2")
+            .t2m_developer_id("795f1844-2f5e-4d8b-9922-25c45d3e1c47")
+            .build()
+            .unwrap();
+
+        let json_response = json!({
+          "message": "Method [wrong] is invalid",
+          "code": 403,
+          "success": false
+        });
+
+        Mock::given(method("GET"))
+            .and(query_param("t2maccount", "account2"))
+            .and(query_param("t2musername", "username2"))
+            .and(query_param("t2mpassword", "password2"))
+            .and(query_param(
+                "t2mdeveloperid",
+                "795f1844-2f5e-4d8b-9922-25c45d3e1c47",
+            ))
+            .and(path("/t2mapi/wrong"))
+            .respond_with(ResponseTemplate::new(403).set_body_json(&json_response))
+            .expect(1)
+            .mount(&server)
+            .await;
+
+        let api_response = match client.request_api("wrong", None).await {
+            Ok(_) => panic!("client.request_api() should have returned an UnknownMethod"),
+            Err(err) => err,
+        };
+
+        assert_eq!(
+            api_response,
+            error::Error {
+                code: 403,
+                kind: error::ErrorKind::MissingOrWrongParameter(
+                    "Method [wrong] is invalid".to_string()
+                ),
+            }
+        );
     }
 }

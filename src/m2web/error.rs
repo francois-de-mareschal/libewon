@@ -15,10 +15,12 @@ pub struct Error {
 pub enum ErrorKind {
     /// This error occurs when the API returns and empty response.
     EmptyResponse(String),
+    /// This error occurs when an internal call goes wrong and return an error.
+    InternalError(String),
     /// This error occurs when one of the authentication parameters provided to the M2Web API is wrong.
     InvalidCredentials(String),
-    /// This error occurs when a mandatory parameter is missing.
-    MissingParameter(String),
+    /// This error occurs when a mandatory parameter or endpoint is missing or wrong
+    MissingOrWrongParameter(String),
     /// This error occurs when the API returns an empty response.
     NoContent(String),
     /// This error occurs when the API client is unable to parse and deserialize the JSON response from the API.
@@ -38,10 +40,13 @@ impl fmt::Display for Error {
             ErrorKind::EmptyResponse(ref error_message) => {
                 write!(f, "HTTP {}: {}", self.code, error_message)
             }
+            ErrorKind::InternalError(ref error_message) => {
+                write!(f, "Internal error: {}", error_message)
+            }
             ErrorKind::InvalidCredentials(ref error_message) => {
                 write!(f, "HTTP {}: {}", self.code, error_message)
             }
-            ErrorKind::MissingParameter(ref error_message) => {
+            ErrorKind::MissingOrWrongParameter(ref error_message) => {
                 write!(f, "HTTP {}: {}", self.code, error_message)
             }
             ErrorKind::NoContent(ref error_message) => {
