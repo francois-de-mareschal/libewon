@@ -6,6 +6,12 @@
 
 ## Documentation
 
+### Integrated documentation
+
+```sh
+cargo doc --open
+```
+
 ## Examples
 
 ## Contribute
