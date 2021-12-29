@@ -206,6 +206,13 @@ impl<'a> Client<'a> {
         url_path: &str,
         req_query_params: Option<Vec<(&str, &str)>>,
     ) -> Result<ApiResponse, error::Error> {
+        // Check if the endpoint is provided.
+        if url_path.is_empty() {
+            return Err(error::Error {
+                code: 500,
+                kind: error::ErrorKind::InternalError("no API endpoint provided".to_string()),
+            });
+        }
         // Check if the auth is stateful or not.
         let mut query_params = match self.stateful_auth {
             true => match url_path {
@@ -266,12 +273,27 @@ impl<'a> Client<'a> {
             false => match http_status {
                 reqwest::StatusCode::BAD_REQUEST => Err(error::Error {
                     code: http_status.as_u16(),
-                    kind: error::ErrorKind::MissingParameter(format!("{}", api_response.message)),
+                    kind: error::ErrorKind::MissingOrWrongParameter(format!(
+                        "{}",
+                        api_response.message
+                    )),
                 }),
-                reqwest::StatusCode::FORBIDDEN => Err(error::Error {
-                    code: http_status.as_u16(),
-                    kind: error::ErrorKind::InvalidCredentials(format!("{}", api_response.message)),
-                }),
+                reqwest::StatusCode::FORBIDDEN => match api_response.message.as_ref() {
+                    "Invalid credentials" => Err(error::Error {
+                        code: http_status.as_u16(),
+                        kind: error::ErrorKind::InvalidCredentials(format!(
+                            "{}",
+                            api_response.message
+                        )),
+                    }),
+                    _ => Err(error::Error {
+                        code: 403,
+                        kind: error::ErrorKind::MissingOrWrongParameter(format!(
+                            "{}",
+                            api_response.message
+                        )),
+                    }),
+                },
                 reqwest::StatusCode::GONE => Err(error::Error {
                     code: http_status.as_u16(),
                     kind: error::ErrorKind::EmptyResponse(format!("{}", api_response.message)),
@@ -354,7 +376,7 @@ mod test {
             error::Error {
                 code: 403,
                 kind: error::ErrorKind::MissingOrWrongParameter(
-                    "HTTP 403: Method [wrong] is invalid".to_string()
+                    "Method [wrong] is invalid".to_string()
                 ),
             }
         );
