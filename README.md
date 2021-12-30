@@ -77,7 +77,7 @@ let ewon_ewon42: Ewon = client.get_ewon_by_name("ewon42").await?;
 ```rust
 use libewon::m2web::client::ClientBuilder;
 
-let client = ClientBuilder::default()
+let mut client = ClientBuilder::default()
     .t2m_account("account2")
     .t2m_username("username2")
     .t2m_password("password2")
