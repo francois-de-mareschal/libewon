@@ -2,9 +2,13 @@
 
 `libewon` is a wrapper around the [M2Web API](https://developer.ewon.biz/content/m2web-api-0) of the [Talk2M](https://www.ewon.biz/products/talk2m) industrial cloud.
 
-`libewon` is a project from [SMAG Graphique](https://www.smag_graphique.com).
+## Project status
 
-![SMAG Graphique](https://www.smag-graphique.com/build/assets/images/img-logo.2bb13ee3.svg)
+<div align="center">
+  ![SMAG Graphique](https://www.smag-graphique.com/build/assets/images/img-logo.2bb13ee3.svg)
+
+  Made with :heart: by [SMAG Graphique](https://www.smag_graphique.com).
+</div>
 
 ## Installation
 
