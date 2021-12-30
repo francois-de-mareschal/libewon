@@ -12,6 +12,15 @@
 
 ## Installation
 
+The `libewon` is not yet available from crates.io. It will be published once at least all API endpoints have been wrapped around.
+
+Currently, to add `libewon` as a dependency, add the following line to `Cargo.toml`:
+```toml
+libewon = {git = "https://gitlab.com/francois-de-mareschal/libewon", branch = "develop"}
+```
+
+:warning: Follow the `develop` branch!
+
 ## Documentation
 
 ### Integrated documentation
