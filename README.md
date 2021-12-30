@@ -9,7 +9,7 @@ The project is currently in **alpha** state and cannot be considered stable. Bre
 <div align="center">
   ![SMAG Graphique](https://www.smag-graphique.com/build/assets/images/img-logo.2bb13ee3.svg)
 
-  Made with :heart: by [SMAG Graphique](https://www.smag_graphique.com).
+  Made with :heart: by [SMAG Graphique](https://www.smag-graphique.com).
 </div>
 
 ## Installation
