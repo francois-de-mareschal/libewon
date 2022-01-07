@@ -1,0 +1,37 @@
+stages:
+  - check
+  - test
+  - build-debug
+  - build-release
+
+default:
+  image: rustlang/rust:latest
+  before_script:
+    - rustup component add rustfmt
+    - rustup component add clippy
+
+format:
+  stage: check
+  script:
+    - cargo +stable fmt -- --check
+  allow_failure: true
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == $CI_DEFAULT_BRANCH
+      allow_failure: false
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      allow_failure: false
+    - if: $CI_COMMIT_BRANCH == "master"
+      allow_failure: false
+
+clippy:
+  stage: check
+  script:
+    - cargo +stable clippy
+  allow_failure: true
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == $CI_DEFAULT_BRANCH
+      allow_failure: false
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      allow_failure: false
+    - if: $CI_COMMIT_BRANCH == "master"
+      allow_failure: false
