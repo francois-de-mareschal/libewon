@@ -56,11 +56,27 @@ build-debug-nightly:
     - rustup override set nightly
     - cargo +nightly build --verbose
   allow_failure: true
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME != $CI_DEFAULT_BRANCH
+      when: always
+    - if: $CI_COMMIT_BRANCH != $CI_DEFAULT_BRANCH
+      when: always
+    - if: $CI_COMMIT_BRANCH != "master"
+      when: always
+    - when: never
 
 build-debug-stable:
   stage: build-debug
   script:
     - cargo build --verbose
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME != $CI_DEFAULT_BRANCH
+      when: always
+    - if: $CI_COMMIT_BRANCH != $CI_DEFAULT_BRANCH
+      when: always
+    - if: $CI_COMMIT_BRANCH != "master"
+      when: always
+    - when: never
 
 build-release-nightly:
   stage: build-release
@@ -68,8 +84,24 @@ build-release-nightly:
     - rustup override set nightly
     - cargo +nightly build --release --verbose
   allow_failure: true
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == $CI_DEFAULT_BRANCH
+      when: always
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      when: always
+    - if: $CI_COMMIT_BRANCH == "master"
+      when: always
+    - when: never
 
 build-release-stable:
   stage: build-release
   script:
     - cargo build --release --verbose
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == $CI_DEFAULT_BRANCH
+      when: always
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      when: always
+    - if: $CI_COMMIT_BRANCH == "master"
+      when: always
+    - when: never
