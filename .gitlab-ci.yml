@@ -5,7 +5,7 @@ stages:
   - build-release
 
 default:
-  image: rustlang/rust:latest
+  image: rust:latest
   before_script:
     - rustup component add rustfmt
     - rustup component add clippy
