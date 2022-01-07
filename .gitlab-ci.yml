@@ -7,15 +7,13 @@ stages:
 default:
   image: rust:latest
   before_script:
-    - export PATH=$PATH:/root/.cargo/bin/
-    - rustup install stable
     - rustup component add rustfmt
     - rustup component add clippy
 
 format:
   stage: check
   script:
-    - cargo +stable fmt -- --check
+    - cargo fmt -- --check
   allow_failure: true
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == $CI_DEFAULT_BRANCH
@@ -28,7 +26,7 @@ format:
 clippy:
   stage: check
   script:
-    - cargo +stable clippy
+    - cargo clippy
   allow_failure: true
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == $CI_DEFAULT_BRANCH
