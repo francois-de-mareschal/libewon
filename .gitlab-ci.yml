@@ -35,3 +35,14 @@ clippy:
       allow_failure: false
     - if: $CI_COMMIT_BRANCH == "master"
       allow_failure: false
+
+test-nightly:
+  stage: test
+  script:
+    - rustup component add test-nightly
+    - cargo +nightly test
+
+test-stable:
+  stage: test
+  script:
+    - cargo test
