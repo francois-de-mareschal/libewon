@@ -39,7 +39,7 @@ clippy:
 test-nightly:
   stage: test
   script:
-    - rustup component add test-nightly
+    - rustup override set nightly
     - cargo +nightly test
 
 test-stable:
