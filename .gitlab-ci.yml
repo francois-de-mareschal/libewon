@@ -22,6 +22,7 @@ format:
       allow_failure: false
     - if: $CI_COMMIT_BRANCH == "master"
       allow_failure: false
+    - when: always
 
 clippy:
   stage: check
@@ -35,14 +36,16 @@ clippy:
       allow_failure: false
     - if: $CI_COMMIT_BRANCH == "master"
       allow_failure: false
+    - when: always
 
 test-nightly:
   stage: test
   script:
     - rustup override set nightly
-    - cargo +nightly test
+    - cargo +nightly test --verbose
+  allow_failure: true
 
 test-stable:
   stage: test
   script:
-    - cargo test
+    - cargo test --verbose
