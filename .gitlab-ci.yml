@@ -13,7 +13,7 @@ default:
 format:
   stage: check
   script:
-    - cargo fmt -- --check
+    - cargo fmt --verbose -- --check --verbose
   allow_failure: true
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == $CI_DEFAULT_BRANCH
@@ -27,7 +27,7 @@ format:
 clippy:
   stage: check
   script:
-    - cargo clippy --all-targets --all-features -- -D warnings
+    - cargo clippy --verbose --all-targets --all-features -- -D warnings --verbose
   allow_failure: true
   rules:
     - if: $CI_PIPELINE_SOURCE == "merge_request_event" && $CI_MERGE_REQUEST_TARGET_BRANCH_NAME == $CI_DEFAULT_BRANCH
@@ -49,3 +49,27 @@ test-stable:
   stage: test
   script:
     - cargo test --verbose
+
+build-debug-nightly:
+  stage: build-debug
+  script:
+    - rustup override set nightly
+    - cargo +nightly build --verbose
+  allow_failure: true
+
+build-debug-stable:
+  stage: build-debug
+  script:
+    - cargo build --verbose
+
+build-release-nightly:
+  stage: build-release
+  script:
+    - rustup override set nightly
+    - cargo +nightly build --release --verbose
+  allow_failure: true
+
+build-release-stable:
+  stage: build-release
+  script:
+    - cargo build --release --verbose
